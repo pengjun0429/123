@@ -14,34 +14,42 @@ let isPageLoading = false;
 // 1. 啟動雲端隱形瀏覽器並開啟 地球 Online
 async function initBrowser() {
     console.log("正在啟動雲端瀏覽器...");
-    browser = await puppeteer.launch({
-        headless: true, // 在雲端背景隱形執行
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--window-size=1280,720'
-        ]
-    });
-    page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 720 });
-    
-    console.log("正在前往 地球 Online...");
-    await page.goto('https://earthonline.qzz.io', { waitUntil: 'networkidle2' });
-    console.log("遊戲網頁已載入，等待用戶連線登入...");
+    try {
+        browser = await puppeteer.launch({
+            headless: true, // 在雲端背景隱形執行
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null, // 自動抓取雲端 Chrome 路徑
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu',
+                '--window-size=1280,720'
+            ]
+        });
+        page = await browser.newPage();
+        await page.setViewport({ width: 1280, height: 720 });
+        
+        console.log("正在前往 地球 Online...");
+        await page.goto('https://earthonline.qzz.io', { waitUntil: 'networkidle2' });
+        console.log("遊戲網頁已載入，等待用戶連線登入...");
 
-    // 定時將雲端瀏覽器的截圖發送給所有連線的用戶（實現實時畫面同步）
-    setInterval(async () => {
-        if (page && !isPageLoading) {
-            try {
-                // 擷取隱形瀏覽器的畫面
-                const screenshot = await page.screenshot({ type: 'jpeg', quality: 60 });
-                const base64Image = screenshot.toString('base64');
-                io.emit('screen-update', base64Image);
-            } catch (err) {
-                // 忽略截圖時的短暫錯誤
+        // 定時將雲端瀏覽器的截圖發送給所有連線的用戶（畫面同步）
+        setInterval(async () => {
+            if (page && !isPageLoading) {
+                try {
+                    const screenshot = await page.screenshot({ type: 'jpeg', quality: 60 });
+                    const base64Image = screenshot.toString('base64');
+                    io.emit('screen-update', base64Image);
+                } catch (err) {
+                    // 忽略截圖時的短暫錯誤
+                }
             }
-        }
-    }, 200); // 每秒更新約 5 次畫面
+        }, 200); // 每秒更新約 5 次畫面
+
+    } catch (error) {
+        console.error("瀏覽器啟動失敗：", error);
+    }
 }
 
 // 2. 處理用戶在網域網頁上的操作（滑鼠、鍵盤），並同步給雲端瀏覽器
@@ -114,7 +122,6 @@ app.get('/', (req, res) => {
 
                 // 監聽鍵盤輸入
                 window.addEventListener('keydown', (e) => {
-                    // 防止空白鍵或倒退鍵讓網頁滾動或上一頁
                     if(e.key === ' ' || e.key === 'Backspace') e.preventDefault();
                     socket.emit('keyboard-input', { key: e.key });
                 });
