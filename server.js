@@ -132,9 +132,11 @@ app.get('/', (req, res) => {
 });
 
 //  正確的寫法
+// === 請直接用這段替換 server.js 的最底部 ===
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`控制台伺服器已啟動：http://localhost:${PORT}`);
     initBrowser();
+});
 });
 });
