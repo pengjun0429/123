@@ -18,8 +18,7 @@ async function startHook() {
     
     try {
         browser = await puppeteer.launch({
-            headless: true,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+            headless: true, // 在背景執行
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -60,7 +59,7 @@ app.get('/', (req, res) => {
         </head>
         <body>
             <h1>🎮 地球 Online 24h 雲端掛機系統 (免同步版)</h1>
-            <p class="status">目前雲端狀態：${gameStatus}</p>
+            <p class="status">目前雲端狀態：\${gameStatus}</p>
             
             <form action="/start" method="POST">
                 <button class="btn" type="submit">🚀 點我：讓雲端主機開著遊戲網頁</button>
