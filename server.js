@@ -4,12 +4,12 @@ const app = express();
 
 let browser = null;
 let page = null;
-let gameStatus = "尚未啟動掛機。請點擊下方按鈕開始！";
+let gameStatus = "尚未啟動挂機。請點擊下方按鈕開始！";
 
-// 啟動雲端掛機瀏覽器的函式
+// 啟動雲端挂機瀏覽器的函式
 async function startHook() {
     if (browser) {
-        gameStatus = "地球 Online 已經在後台 24h 掛機中，請勿重複啟動！";
+        gameStatus = "地球 Online 已經在后台 24h 掛機中，請勿重複啟動！";
         return;
     }
     
@@ -19,6 +19,8 @@ async function startHook() {
     try {
         browser = await puppeteer.launch({
             headless: true, // 在背景執行
+            // 🎯 強制指定路徑：這行是 Render 官方標準的 Chrome 下載路徑
+            executablePath: '/opt/render/project/.render/chrome/opt/google/chrome/chrome',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
