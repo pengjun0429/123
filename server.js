@@ -1,141 +1,91 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
-const http = require('http');
-const socketIo = require('socket.io');
-
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
 
-let browser;
-let page;
-let isPageLoading = false;
+let browser = null;
+let page = null;
+let gameStatus = "尚未啟動掛機。請點擊下方按鈕開始！";
 
-// 1. 啟動雲端隱形瀏覽器並開啟 地球 Online
-async function initBrowser() {
-    console.log("正在啟動雲端瀏覽器...");
+// 啟動雲端掛機瀏覽器的函式
+async function startHook() {
+    if (browser) {
+        gameStatus = "地球 Online 已經在後台 24h 掛機中，請勿重複啟動！";
+        return;
+    }
+    
+    gameStatus = "正在雲端啟動瀏覽器，請稍候...";
+    console.log(gameStatus);
+    
     try {
         browser = await puppeteer.launch({
-            headless: true, // 在雲端背景隱形執行
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null, // 自動抓取雲端 Chrome 路徑
+            headless: true,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--disable-gpu',
-                '--window-size=1280,720'
+                '--disable-gpu'
             ]
         });
         page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
-        
-        // 模擬真實瀏覽器標頭，防止被遊戲網站阻擋或卡住
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         
         console.log("正在前往 地球 Online...");
-        // timeout: 0 代表無限等待，直到遊戲網頁結構完全載入成功
         await page.goto('https://earthonline.qzz.io', { waitUntil: 'domcontentloaded', timeout: 0 });
-        console.log("遊戲網頁已載入，等待用戶連線登入...");
-
-        // 定時將雲端瀏覽器的截圖發送給所有連線的用戶（畫面同步）
-        setInterval(async () => {
-            if (page && !isPageLoading) {
-                try {
-                    const screenshot = await page.screenshot({ type: 'jpeg', quality: 60 });
-                    const base64Image = screenshot.toString('base64');
-                    io.emit('screen-update', base64Image);
-                } catch (err) {
-                    // 忽略截圖時的短暫錯誤
-                }
-            }
-        }, 300); // 調整為每秒更新約 3 次，大幅降低 Render 免費主機的 CPU 負擔，防止斷線
-
+        
+        gameStatus = "🎮 遊戲已成功載入！現在請直接去官方網站登入，這台雲端主機會 24h 幫你維持連線狀態！";
+        console.log(gameStatus);
     } catch (error) {
-        console.error("瀏覽器啟動失敗：", error);
+        gameStatus = "啟動失敗: " + error.message;
+        console.error(error);
+        browser = null;
     }
 }
 
-// 2. 處理用戶在網域網頁上的操作（滑鼠、鍵盤），並同步給雲端瀏覽器
-io.on('connection', (socket) => {
-    console.log('用戶已連線至控制台');
-
-    // 處理滑鼠點擊
-    socket.on('mouse-click', async (data) => {
-        if (page) {
-            try {
-                await page.mouse.click(data.x, data.y);
-            } catch (e) {}
-        }
-    });
-
-    // 處理鍵盤輸入
-    socket.on('keyboard-input', async (data) => {
-        if (page) {
-            try {
-                if (data.key === 'Backspace') {
-                    await page.keyboard.press('Backspace');
-                } else {
-                    await page.keyboard.sendCharacter(data.key);
-                }
-            } catch (e) {}
-        }
-    });
-});
-
-// 3. 網域主頁面：顯示雲端畫面並接收操作
+// 網域主頁面
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>地球 Online 24h 雲端掛機控制台</title>
+            <title>地球 Online 24h 雲端掛機免卡頓控制台</title>
             <style>
-                body { background: #121212; color: white; font-family: Arial; text-align: center; margin: 0; padding: 20px; }
-                #canvas-container { position: relative; display: inline-block; border: 2px solid #00ff00; background: #000; }
-                img { display: block; max-width: 100%; height: auto; cursor: crosshair; }
-                .info { margin-bottom: 15px; color: #888; }
+                body { background: #121212; color: white; font-family: Arial; text-align: center; padding-top: 50px; }
+                .btn { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; margin: 20px; }
+                .btn:hover { background: #00cc00; }
+                .status { font-size: 20px; color: #00ffff; margin: 20px; }
+                a { color: #ff00ff; font-size: 18px; text-decoration: none; }
             </style>
-            <script src="/socket.io/socket.io.js"></script>
         </head>
         <body>
-            <h1>🎮 地球 Online 24h 雲端遠端登入/控制台</h1>
-            <p class="info">提示：直接在下方畫面點擊滑鼠或用鍵盤打字，即可操作雲端瀏覽器進行登入。登入後關閉此網頁，雲端仍會繼續掛機。</p>
+            <h1>🎮 地球 Online 24h 雲端掛機系統 (免同步版)</h1>
+            <p class="status">目前雲端狀態：${gameStatus}</p>
             
-            <div id="canvas-container">
-                <img id="screen" src="" alt="等待畫面同步...">
-            </div>
-
-            <script>
-                const socket = io();
-                const screenImg = document.getElementById('screen');
-
-                // 接收雲端畫面並更新
-                socket.on('screen-update', (base64) => {
-                    screenImg.src = 'data:image/jpeg;base64,' + base64;
-                });
-
-                // 監聽點擊事件並回傳座標
-                screenImg.addEventListener('click', (e) => {
-                    const rect = screenImg.getBoundingClientRect();
-                    const x = (e.clientX - rect.left) * (1280 / rect.width);
-                    const y = (e.clientY - rect.top) * (720 / rect.height);
-                    socket.emit('mouse-click', { x, y });
-                });
-
-                // 監聽鍵盤輸入
-                window.addEventListener('keydown', (e) => {
-                    if(e.key === ' ' || e.key === 'Backspace') e.preventDefault();
-                    socket.emit('keyboard-input', { key: e.key });
-                });
-            </script>
+            <form action="/start" method="POST">
+                <button class="btn" type="submit">🚀 點我：讓雲端主機開著遊戲網頁</button>
+            </form>
+            
+            <br><br>
+            <p>💡 使用說明：點擊上方按鈕後，雲端就會 24h 幫你咬住遊戲網站。接著你可以直接點下方連結去登入遊戲：</p>
+            <a href="https://earthonline.qzz.io" target="_blank">👉 點我打開官方遊戲網頁進行登入/掛機 👈</a>
         </body>
         </html>
     `);
 });
 
+// 處理按鈕點擊
+app.post('/start', async (req, res) => {
+    startHook(); // 在背景啟動，不卡住網頁反應
+    res.send(`
+        <script>
+            alert('雲端瀏覽器啟動指令已送出！請等待大約 10 秒後，返回首頁重新整理查看狀態。');
+            window.location.href = '/';
+        </script>
+    `);
+});
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log("控制台伺服器已啟動");
-    initBrowser();
+app.listen(PORT, () => {
+    console.log("免卡頓控制台伺服器已啟動");
 });
