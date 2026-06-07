@@ -30,8 +30,12 @@ async function initBrowser() {
         page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
         
+        // 模擬真實瀏覽器標頭，防止被遊戲網站阻擋或卡住
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
         console.log("正在前往 地球 Online...");
-        await page.goto('https://earthonline.qzz.io', { waitUntil: 'networkidle2' });
+        // timeout: 0 代表無限等待，直到遊戲網頁結構完全載入成功
+        await page.goto('https://earthonline.qzz.io', { waitUntil: 'domcontentloaded', timeout: 0 });
         console.log("遊戲網頁已載入，等待用戶連線登入...");
 
         // 定時將雲端瀏覽器的截圖發送給所有連線的用戶（畫面同步）
@@ -45,7 +49,7 @@ async function initBrowser() {
                     // 忽略截圖時的短暫錯誤
                 }
             }
-        }, 200); // 每秒更新約 5 次畫面
+        }, 300); // 調整為每秒更新約 3 次，大幅降低 Render 免費主機的 CPU 負擔，防止斷線
 
     } catch (error) {
         console.error("瀏覽器啟動失敗：", error);
@@ -114,7 +118,6 @@ app.get('/', (req, res) => {
                 // 監聽點擊事件並回傳座標
                 screenImg.addEventListener('click', (e) => {
                     const rect = screenImg.getBoundingClientRect();
-                    // 換算回雲端瀏覽器的 1280x720 解析度
                     const x = (e.clientX - rect.left) * (1280 / rect.width);
                     const y = (e.clientY - rect.top) * (720 / rect.height);
                     socket.emit('mouse-click', { x, y });
