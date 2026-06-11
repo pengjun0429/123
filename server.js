@@ -19,17 +19,32 @@ async function startHook() {
     try {
         browser = await puppeteer.launch({
             headless: true, // 在背景執行
-            // 🎯 強制指定路徑：這行是 Render 官方標準的 Chrome 下載路徑
             executablePath: '/opt/render/project/.render/chrome/opt/google/chrome/chrome',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
+                '--disable-dev-shm-usage', // ❌ 禁用 Linux 的 /dev/shm 記憶體共用，改用 /tmp，防止記憶體不足崩潰
+                '--disable-gpu',           // ❌ 禁用 GPU 加速，大幅節省記憶體
+                '--no-first-run',          // ❌ 跳過 Chrome 第一次啟動的設定
+                '--no-zygote',             // ❌ 禁用 zygote 進程，減少處理器與記憶體開銷
+                '--single-process',        // 🎯 關鍵：強迫 Chrome 單一線程執行，最省記憶體
+                '--disable-extensions'     // ❌ 禁用所有擴充功能
             ]
         });
         page = await browser.newPage();
-        await page.setViewport({ width: 1280, height: 720 });
+        
+        // 🎯 封鎖圖片與 CSS 載入：掛機不需要看畫面，這樣可以省下 80% 的記憶體與網路流量
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const resourceType = req.resourceType();
+            if (resourceType === 'image' || resourceType === 'stylesheet' || resourceType === 'font') {
+                req.abort(); // 直接拒絕下載圖片和樣式表
+            } else {
+                req.continue();
+            }
+        });
+
+        await page.setViewport({ width: 800, height: 600 }); // 調低解析度節省資源
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         
         console.log("正在前往 地球 Online...");
@@ -40,6 +55,9 @@ async function startHook() {
     } catch (error) {
         gameStatus = "啟動失敗: " + error.message;
         console.error(error);
+        if (browser) {
+            await browser.close();
+        }
         browser = null;
     }
 }
@@ -111,17 +129,32 @@ async function startHook() {
     try {
         browser = await puppeteer.launch({
             headless: true, // 在背景執行
-            // 🎯 強制指定路徑：這行是 Render 官方標準的 Chrome 下載路徑
             executablePath: '/opt/render/project/.render/chrome/opt/google/chrome/chrome',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
+                '--disable-dev-shm-usage', // ❌ 禁用 Linux 的 /dev/shm 記憶體共用，改用 /tmp，防止記憶體不足崩潰
+                '--disable-gpu',           // ❌ 禁用 GPU 加速，大幅節省記憶體
+                '--no-first-run',          // ❌ 跳過 Chrome 第一次啟動的設定
+                '--no-zygote',             // ❌ 禁用 zygote 進程，減少處理器與記憶體開銷
+                '--single-process',        // 🎯 關鍵：強迫 Chrome 單一線程執行，最省記憶體
+                '--disable-extensions'     // ❌ 禁用所有擴充功能
             ]
         });
         page = await browser.newPage();
-        await page.setViewport({ width: 1280, height: 720 });
+        
+        // 🎯 封鎖圖片與 CSS 載入：掛機不需要看畫面，這樣可以省下 80% 的記憶體與網路流量
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const resourceType = req.resourceType();
+            if (resourceType === 'image' || resourceType === 'stylesheet' || resourceType === 'font') {
+                req.abort(); // 直接拒絕下載圖片和樣式表
+            } else {
+                req.continue();
+            }
+        });
+
+        await page.setViewport({ width: 800, height: 600 }); // 調低解析度節省資源
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         
         console.log("正在前往 地球 Online...");
@@ -132,6 +165,9 @@ async function startHook() {
     } catch (error) {
         gameStatus = "啟動失敗: " + error.message;
         console.error(error);
+        if (browser) {
+            await browser.close();
+        }
         browser = null;
     }
 }
